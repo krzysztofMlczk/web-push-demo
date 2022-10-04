@@ -92,7 +92,7 @@ app.post("/notify-all", async (request, response) => {
     // find all subscription documents
     const subscriptions = await Subscription.find();
     if (subscriptions.length > 0) {
-      sendNotifications(subscriptions);
+      sendNotification(subscriptions);
       response.sendStatus(200);
     } else {
       response.sendStatus(409);
