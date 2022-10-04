@@ -2,21 +2,15 @@ require("dotenv").config();
 const express = require("express");
 const webpush = require("web-push");
 const bodyparser = require("body-parser");
-const low = require("lowdb");
-const FileSync = require("lowdb/adapters/FileSync");
-const adapter = new FileSync("./data/db.json");
-const db = low(adapter);
+const { Subscription, connectToMongoDB } = require("./database");
+
 const vapidDetails = {
   publicKey: process.env.VAPID_PUBLIC_KEY,
   privateKey: process.env.VAPID_PRIVATE_KEY,
   subject: process.env.VAPID_SUBJECT,
 };
 
-db.defaults({
-  subscriptions: [],
-}).write();
-
-function sendNotifications(subscriptions) {
+function sendNotification(subscriptions) {
   // Create the notification content.
   const notification = JSON.stringify({
     title: "Hello, Notifications!",
@@ -51,36 +45,61 @@ const app = express();
 app.use(bodyparser.json());
 app.use(express.static("public"));
 
-app.post("/add-subscription", (request, response) => {
+app.post("/add-subscription", async (request, response) => {
   console.log(`Subscribing ${request.body.endpoint}`);
-  db.get("subscriptions").push(request.body).write();
-  response.sendStatus(200);
-});
-
-app.post("/remove-subscription", (request, response) => {
-  console.log(`Unsubscribing ${request.body.endpoint}`);
-  db.get("subscriptions").remove({ endpoint: request.body.endpoint }).write();
-  response.sendStatus(200);
-});
-
-app.post("/notify-me", (request, response) => {
-  console.log(`Notifying ${request.body.endpoint}`);
-  const subscription = db
-    .get("subscriptions")
-    .find({ endpoint: request.body.endpoint })
-    .value();
-  sendNotifications([subscription]);
-  response.sendStatus(200);
-});
-
-app.post("/notify-all", (request, response) => {
-  console.log("Notifying all subscribers");
-  const subscriptions = db.get("subscriptions").cloneDeep().value();
-  if (subscriptions.length > 0) {
-    sendNotifications(subscriptions);
+  try {
+    // add subscription document to the mongodb
+    await new Subscription(request.body).save();
     response.sendStatus(200);
-  } else {
-    response.sendStatus(409);
+  } catch (err) {
+    console.error(err);
+    response.sendStatus(507);
+  }
+});
+
+app.post("/remove-subscription", async (request, response) => {
+  console.log(`Unsubscribing ${request.body.endpoint}`);
+  try {
+    // remove subscription document from mongodb
+    await Subscription.deleteOne({
+      endpoint: request.body.endpoint,
+    });
+    response.sendStatus(200);
+  } catch (err) {
+    console.error(err);
+    response.sendStatus(507);
+  }
+});
+
+app.post("/notify-me", async (request, response) => {
+  console.log(`Notifying ${request.body.endpoint}`);
+  try {
+    // find subscription document of a user that requested to notify him
+    const subscription = await Subscription.findOne({
+      endpoint: request.body.endpoint,
+    });
+    sendNotification([subscription]);
+    response.sendStatus(200);
+  } catch (err) {
+    console.error(err);
+    response.sendStatus(507);
+  }
+});
+
+app.post("/notify-all", async (request, response) => {
+  console.log("Notifying all subscribers");
+  try {
+    // find all subscription documents
+    const subscriptions = await Subscription.find();
+    if (subscriptions.length > 0) {
+      sendNotification(subscriptions);
+      response.sendStatus(200);
+    } else {
+      response.sendStatus(409);
+    }
+  } catch (err) {
+    console.error(err);
+    response.sendStatus(507);
   }
 });
 
@@ -90,4 +109,5 @@ app.get("/", (request, response) => {
 
 const listener = app.listen(process.env.PORT, () => {
   console.log(`Listening on port ${listener.address().port}`);
+  connectToMongoDB();
 });
