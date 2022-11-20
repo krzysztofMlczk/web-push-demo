@@ -60,7 +60,7 @@ async function unsubscribeButtonHandler() {
 }
 
 // Convert a base64 string to Uint8Array.
-// Must do this so the server can understand the VAPID_PUBLIC_KEY.
+// This is a format required by the PushService
 function urlB64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
