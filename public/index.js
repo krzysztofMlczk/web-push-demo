@@ -4,7 +4,6 @@ const VAPID_PUBLIC_KEY =
   "BH1s6FeM4Jb_lmHprBvPQLZQw3-68vPlWNxaBZJH0UQIAFMtMBX0esmRqTOkrnA0rXFXN1AP09RMXldnFZ0uJ4M";
 const subscribeButton = document.getElementById("subscribe");
 const unsubscribeButton = document.getElementById("unsubscribe");
-const notifyMeButton = document.getElementById("notify-me");
 
 async function subscribeButtonHandler() {
   // Prevent the user from clicking the subscribe button multiple times.
@@ -22,7 +21,6 @@ async function subscribeButtonHandler() {
   const subscribed = await registration.pushManager.getSubscription();
   if (subscribed) {
     console.info("User is already subscribed.");
-    notifyMeButton.disabled = false;
     unsubscribeButton.disabled = false;
     return;
   }
@@ -30,7 +28,6 @@ async function subscribeButtonHandler() {
     userVisibleOnly: true,
     applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
   });
-  notifyMeButton.disabled = false;
   fetch("/add-subscription", {
     method: "POST",
     headers: {
@@ -38,6 +35,7 @@ async function subscribeButtonHandler() {
     },
     body: JSON.stringify(subscription),
   });
+  unsubscribeButton.disabled = false; // unlock the button because subscription was successful
 }
 
 async function unsubscribeButtonHandler() {
@@ -55,7 +53,6 @@ async function unsubscribeButtonHandler() {
     console.info("Successfully unsubscribed from push notifications.");
     unsubscribeButton.disabled = true;
     subscribeButton.disabled = false;
-    notifyMeButton.disabled = true;
   }
 }
 
@@ -91,29 +88,6 @@ if ("serviceWorker" in navigator && "PushManager" in window) {
   console.error("Browser does not support service workers or push messages.");
 }
 
+// add button event listeners
 subscribeButton.addEventListener("click", subscribeButtonHandler);
 unsubscribeButton.addEventListener("click", unsubscribeButtonHandler);
-
-// Logic for the "Notify me" and "Notify all" buttons.
-
-document.getElementById("notify-me").addEventListener("click", async () => {
-  const registration = await navigator.serviceWorker.getRegistration();
-  const subscription = await registration.pushManager.getSubscription();
-  fetch("/notify-me", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ endpoint: subscription.endpoint }),
-  });
-});
-
-document.getElementById("notify-all").addEventListener("click", async () => {
-  const response = await fetch("/notify-all", {
-    method: "POST",
-  });
-  if (response.status === 409) {
-    document.getElementById("notification-status-message").textContent =
-      "There are no subscribed endpoints to send messages to, yet.";
-  }
-});

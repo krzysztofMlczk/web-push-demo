@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const basicAuth = require("express-basic-auth");
 const webpush = require("web-push");
 const bodyparser = require("body-parser");
 const { Subscription, connectToMongoDB } = require("./database");
@@ -10,12 +11,13 @@ const vapidDetails = {
   subject: process.env.VAPID_SUBJECT,
 };
 
-function sendNotification(subscriptions) {
+function sendNotification(subscriptions, title, body, url) {
   // Create the notification content.
   const notification = JSON.stringify({
-    title: "Hello, Notifications!",
+    title: title || "Hello, Notifications",
     options: {
-      body: `ID: ${Math.floor(Math.random() * 100)}`,
+      body: body || `ID: ${Math.floor(Math.random() * 100)}`,
+      url: url || null,
     },
   });
   // Customize how the push service should attempt to deliver the push message.
@@ -45,6 +47,11 @@ const app = express();
 app.use(bodyparser.json());
 app.use(express.static("public"));
 
+// CLIENT ---------
+app.get("/", (request, response) => {
+  response.sendFile(__dirname + "/views/index.html");
+});
+
 app.post("/add-subscription", async (request, response) => {
   console.log(`Subscribing ${request.body.endpoint}`);
   try {
@@ -71,42 +78,44 @@ app.post("/remove-subscription", async (request, response) => {
   }
 });
 
-app.post("/notify-me", async (request, response) => {
-  console.log(`Notifying ${request.body.endpoint}`);
-  try {
-    // find subscription document of a user that requested to notify him
-    const subscription = await Subscription.findOne({
-      endpoint: request.body.endpoint,
-    });
-    sendNotification([subscription]);
-    response.sendStatus(200);
-  } catch (err) {
-    console.error(err);
-    response.sendStatus(507);
+// ADMIN ---------
+app.get(
+  "/admin",
+  basicAuth({
+    users: { [`${process.env.ADMIN_LOGIN}`]: `${process.env.ADMIN_PASSWORD}` },
+    challenge: true,
+  }),
+  (request, response) => {
+    response.sendFile(__dirname + "/views/admin.html");
   }
-});
+);
 
-app.post("/notify-all", async (request, response) => {
-  console.log("Notifying all subscribers");
-  try {
-    // find all subscription documents
-    const subscriptions = await Subscription.find();
-    if (subscriptions.length > 0) {
-      sendNotification(subscriptions);
-      response.sendStatus(200);
-    } else {
-      response.sendStatus(409);
+app.post(
+  "/notify-all",
+  basicAuth({
+    users: { [`${process.env.ADMIN_LOGIN}`]: `${process.env.ADMIN_PASSWORD}` },
+    challenge: true,
+  }),
+  async (request, response) => {
+    console.log("Notifying all subscribers");
+    const { title, body, url } = request.body;
+    try {
+      // find all subscription documents
+      const subscriptions = await Subscription.find();
+      if (subscriptions.length > 0) {
+        sendNotification(subscriptions, title, body, url);
+        response.sendStatus(200);
+      } else {
+        response.sendStatus(409);
+      }
+    } catch (err) {
+      console.error(err);
+      response.sendStatus(507);
     }
-  } catch (err) {
-    console.error(err);
-    response.sendStatus(507);
   }
-});
+);
 
-app.get("/", (request, response) => {
-  response.sendFile(__dirname + "/views/index.html");
-});
-
+// Run the server
 const listener = app.listen(process.env.PORT, () => {
   console.log(`Listening on port ${listener.address().port}`);
   connectToMongoDB();

@@ -1,3 +1,4 @@
+let onClickUrl;
 self.addEventListener("push", (event) => {
   let data = event.data.json();
   const image =
@@ -6,12 +7,13 @@ self.addEventListener("push", (event) => {
     body: data.options.body,
     icon: image,
   };
+  onClickUrl = data.options.url;
   self.registration.showNotification(data.title, options);
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(
-    self.clients.openWindow("https://www.linkedin.com/in/krzysztof-malczak/")
-  );
+  if (onClickUrl) {
+    event.waitUntil(self.clients.openWindow(onClickUrl));
+  }
 });

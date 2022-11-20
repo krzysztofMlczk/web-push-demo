@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Push notifications Admin</title>
+    <script src="admin.js" async></script>
+    <style>
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+      }
+      input,
+      select,
+      button {
+        padding: 10px;
+        margin-bottom: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <form onsubmit="onNotifyAll(); return false;">
+      <h1>Push notifications Admin</h1>
+
+      <label for="push-title">Title:</label>
+      <input type="input" name="push-title" id="push-title" />
+
+      <label for="push-body">Body:</label>
+      <input type="input" name="push-body" id="push-body" />
+
+      <!-- URL to which redirect when clicking on notification-->
+
+      <label for="push-url">Url:</label>
+      <select name="push-url" id="push-url">
+        <option value="https://www.linkedin.com/company/ardentcode/mycompany/">
+          ArdentCode LinkedIn
+        </option>
+        <option value="https://www.linkedin.com/in/krzysztof-malczak/">
+          Krzysztof LinkedIn
+        </option>
+      </select>
+
+      <button type="submit">Notify all</button>
+    </form>
+  </body>
+</html>
